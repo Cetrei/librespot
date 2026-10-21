@@ -129,9 +129,19 @@ impl AudioFetchParams {
     }
 }
 
+/// A reader an app hands over in place of a download, such as a file it kept for offline play.
+pub trait ProvidedFile: Read + Seek + Send + Sync {}
+
+impl<T: Read + Seek + Send + Sync> ProvidedFile for T {}
+
 pub enum AudioFile {
     Cached(fs::File),
     Streaming(AudioFileStreaming),
+    /// The encrypted file as an app kept it, `len` bytes long.
+    Provided {
+        file: Box<dyn ProvidedFile>,
+        len: u64,
+    },
 }
 
 #[derive(Debug)]
@@ -424,6 +434,7 @@ impl AudioFile {
                 stream_shared: None,
                 file_size: file.metadata()?.len() as usize,
             },
+            AudioFile::Provided { len, .. } => StreamLoaderController::from_local_file(*len),
         };
 
         Ok(controller)
@@ -673,6 +684,7 @@ impl Read for AudioFile {
         match *self {
             AudioFile::Cached(ref mut file) => file.read(output),
             AudioFile::Streaming(ref mut file) => file.read(output),
+            AudioFile::Provided { ref mut file, .. } => file.read(output),
         }
     }
 }
@@ -682,6 +694,7 @@ impl Seek for AudioFile {
         match *self {
             AudioFile::Cached(ref mut file) => file.seek(pos),
             AudioFile::Streaming(ref mut file) => file.seek(pos),
+            AudioFile::Provided { ref mut file, .. } => file.seek(pos),
         }
     }
 }

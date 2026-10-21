@@ -38,6 +38,34 @@ pub enum AudioFileFormat {
     OTHER5,  // 13
 }
 
+impl From<AudioFileFormat> for i32 {
+    /// The number Spotify's protocol gives the format, which [`AudioFileFormat::try_from`] reads
+    /// back.
+    fn from(format: AudioFileFormat) -> Self {
+        match format {
+            AudioFileFormat::OGG_VORBIS_96 => 0,
+            AudioFileFormat::OGG_VORBIS_160 => 1,
+            AudioFileFormat::OGG_VORBIS_320 => 2,
+            AudioFileFormat::MP3_256 => 3,
+            AudioFileFormat::MP3_320 => 4,
+            AudioFileFormat::MP3_160 => 5,
+            AudioFileFormat::MP3_96 => 6,
+            AudioFileFormat::MP3_160_ENC => 7,
+            AudioFileFormat::AAC_24 => 8,
+            AudioFileFormat::AAC_48 => 9,
+            AudioFileFormat::AAC_160 => 10,
+            AudioFileFormat::AAC_320 => 11,
+            AudioFileFormat::MP4_128 => 12,
+            AudioFileFormat::OTHER5 => 13,
+            AudioFileFormat::FLAC_FLAC => 16,
+            AudioFileFormat::XHE_AAC_24 => 18,
+            AudioFileFormat::XHE_AAC_16 => 19,
+            AudioFileFormat::XHE_AAC_12 => 20,
+            AudioFileFormat::FLAC_FLAC_24BIT => 22,
+        }
+    }
+}
+
 impl TryFrom<i32> for AudioFileFormat {
     type Error = i32;
 

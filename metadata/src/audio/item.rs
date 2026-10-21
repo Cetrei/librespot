@@ -14,6 +14,11 @@ use crate::{
 use super::file::AudioFiles;
 
 use librespot_core::{Error, Session, SpotifyUri, date::Date, session::UserData};
+use librespot_protocol as protocol;
+use protobuf::Message as _;
+
+/// Where cover images are fetched from when the account names nowhere else.
+const DEFAULT_IMAGE_URL: &str = "https://i.scdn.co/image/{file_id}";
 
 pub type AudioItemResult = Result<AudioItem, Error>;
 
@@ -68,10 +73,72 @@ pub enum UniqueFields {
 }
 
 impl AudioItem {
+    /// Builds a track's item from the `TRACK_V4` protobuf `bytes` an app kept when it downloaded
+    /// the track, without asking the session. The track counts as available, since Spotify
+    /// served it to this account when it was kept.
+    pub fn from_track_bytes(bytes: &[u8], uri: SpotifyUri) -> AudioItemResult {
+        let message = protocol::metadata::Track::parse_from_bytes(bytes)?;
+        let track = <Track as crate::Metadata>::parse(&message, &uri)?;
+        if track.duration <= 0 {
+            return Err(Error::unavailable(MetadataError::InvalidDuration(
+                track.duration,
+            )));
+        }
+        Ok(Self::from_track(
+            track,
+            uri,
+            String::from(DEFAULT_IMAGE_URL),
+            Ok(()),
+        ))
+    }
+
+    fn from_track(
+        track: Track,
+        uri: SpotifyUri,
+        image_url: String,
+        availability: AudioItemAvailability,
+    ) -> Self {
+        let uri_string = uri.to_uri();
+        let album_artists = track
+            .album
+            .artists
+            .0
+            .into_iter()
+            .map(|a| a.name)
+            .collect::<Vec<String>>();
+        let covers = get_covers(track.album.covers, image_url);
+        let alternatives = if track.alternatives.is_empty() {
+            None
+        } else {
+            Some(track.alternatives)
+        };
+        let unique_fields = UniqueFields::Track {
+            artists: track.artists_with_role,
+            album: track.album.name,
+            album_artists,
+            popularity: track.popularity.clamp(0, 100) as u8,
+            number: track.number.max(0) as u32,
+            disc_number: track.disc_number.max(0) as u32,
+        };
+        Self {
+            track_id: uri,
+            uri: uri_string,
+            files: track.files,
+            name: track.name,
+            covers,
+            language: track.language_of_performance,
+            duration_ms: track.duration as u32,
+            is_explicit: track.is_explicit,
+            availability,
+            alternatives,
+            unique_fields,
+        }
+    }
+
     pub async fn get_file(session: &Session, uri: SpotifyUri) -> AudioItemResult {
         let image_url = session
             .get_user_attribute("image-url")
-            .unwrap_or_else(|| String::from("https://i.scdn.co/image/{file_id}"));
+            .unwrap_or_else(|| String::from(DEFAULT_IMAGE_URL));
 
         match uri {
             SpotifyUri::Track { .. } => {
@@ -87,25 +154,6 @@ impl AudioItem {
                     return Err(Error::unavailable(MetadataError::ExplicitContentFiltered));
                 }
 
-                let uri_string = uri.to_uri();
-                let album = track.album.name;
-
-                let album_artists = track
-                    .album
-                    .artists
-                    .0
-                    .into_iter()
-                    .map(|a| a.name)
-                    .collect::<Vec<String>>();
-
-                let covers = get_covers(track.album.covers, image_url);
-
-                let alternatives = if track.alternatives.is_empty() {
-                    None
-                } else {
-                    Some(track.alternatives)
-                };
-
                 let availability = if Date::now_utc() < track.earliest_live_timestamp {
                     Err(UnavailabilityReason::Embargo)
                 } else {
@@ -116,32 +164,7 @@ impl AudioItem {
                     )
                 };
 
-                let popularity = track.popularity.clamp(0, 100) as u8;
-                let number = track.number.max(0) as u32;
-                let disc_number = track.disc_number.max(0) as u32;
-
-                let unique_fields = UniqueFields::Track {
-                    artists: track.artists_with_role,
-                    album,
-                    album_artists,
-                    popularity,
-                    number,
-                    disc_number,
-                };
-
-                Ok(Self {
-                    track_id: uri,
-                    uri: uri_string,
-                    files: track.files,
-                    name: track.name,
-                    covers,
-                    language: track.language_of_performance,
-                    duration_ms: track.duration as u32,
-                    is_explicit: track.is_explicit,
-                    availability,
-                    alternatives,
-                    unique_fields,
-                })
+                Ok(Self::from_track(track, uri, image_url, availability))
             }
             SpotifyUri::Episode { .. } => {
                 let episode = Episode::get(session, &uri).await?;

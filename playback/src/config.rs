@@ -1,7 +1,7 @@
-use std::{mem, path::PathBuf, str::FromStr, time::Duration};
+use std::{mem, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 pub use crate::dither::{DithererBuilder, TriangularDitherer, mk_ditherer};
-use crate::{convert::i24, player::duration_to_coefficient};
+use crate::{convert::i24, offline::Offline, player::duration_to_coefficient};
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq, Default)]
 pub enum Bitrate {
@@ -124,6 +124,8 @@ pub struct PlayerConfig {
     /// Setting this will enable periodically sending events during playback informing about the playback position
     /// To consume the PlayerEvent::PositionChanged event, listen to events via `Player::get_player_event_channel()``
     pub position_update_interval: Option<Duration>,
+    /// The tracks the app downloaded, which play from its copy before the network is asked.
+    pub offline: Option<Arc<dyn Offline>>,
 }
 
 impl Default for PlayerConfig {
@@ -143,6 +145,7 @@ impl Default for PlayerConfig {
             ditherer: Some(mk_ditherer::<TriangularDitherer>),
             position_update_interval: None,
             local_file_directories: Vec::new(),
+            offline: None,
         }
     }
 }
