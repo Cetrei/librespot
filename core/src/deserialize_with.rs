@@ -66,6 +66,17 @@ where
     Ok(res)
 }
 
+/// Reads a value the sender may write as `null` and takes the default for it. Spotify sends
+/// `"logging_params": null` on the transfer a Jam hands to a joining device, which a plain
+/// struct field refuses, so the whole command fell through to the unknown ones.
+pub fn null_as_default<'de, T, D>(de: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    Ok(Option::<T>::deserialize(de)?.unwrap_or_default())
+}
+
 pub fn boxed<'de, T, D>(de: D) -> Result<Box<T>, D::Error>
 where
     T: Deserialize<'de>,

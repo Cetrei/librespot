@@ -86,6 +86,7 @@ pub struct TransferCommand {
     pub data: Option<TransferState>,
     pub options: TransferOptions,
     pub from_device_identifier: String,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
@@ -96,12 +97,14 @@ pub struct PlayCommand {
     #[serde(deserialize_with = "json_proto")]
     pub play_origin: PlayOrigin,
     pub options: PlayOptions,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct PauseCommand {
     // does send options with it, but seems to be empty, investigate which options are send here
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
@@ -109,6 +112,7 @@ pub struct PauseCommand {
 pub struct SeekToCommand {
     pub value: u32,
     pub position: u32,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
@@ -116,12 +120,14 @@ pub struct SeekToCommand {
 pub struct SkipNextCommand {
     #[serde(default, deserialize_with = "option_json_proto")]
     pub track: Option<ProvidedTrack>,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SetValueCommand {
     pub value: bool,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
@@ -129,6 +135,7 @@ pub struct SetValueCommand {
 pub struct AddToQueueCommand {
     #[serde(deserialize_with = "json_proto")]
     pub track: ProvidedTrack,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
@@ -141,6 +148,7 @@ pub struct SetQueueCommand {
     // this queue revision is actually the last revision, so using it will not update the web ui
     // might be that internally they use the last revision to create the next revision
     pub queue_revision: String,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
@@ -150,6 +158,7 @@ pub struct SetOptionsCommand {
     pub repeating_context: Option<bool>,
     pub repeating_track: Option<bool>,
     pub options: Option<OptionsOptions>,
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
@@ -162,6 +171,7 @@ pub struct UpdateContextCommand {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct GenericCommand {
+    #[serde(default, deserialize_with = "null_as_default")]
     pub logging_params: LoggingParams,
 }
 
@@ -207,11 +217,30 @@ pub struct SkipTo {
     pub track_index: Option<u32>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct LoggingParams {
     pub interaction_ids: Option<Vec<String>>,
     pub device_identifier: Option<String>,
     pub command_initiated_time: Option<i64>,
     pub page_instance_ids: Option<Vec<String>>,
     pub command_id: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_transfer_with_null_logging_params_is_still_a_transfer() {
+        let json = r#"{"message_id":1,"sent_by_device_id":"d","command":{"endpoint":"transfer","options":{"restore_paused":"restore"},"from_device_identifier":"social-connect-x","logging_params":null}}"#;
+        let request: Request = serde_json::from_str(json).unwrap();
+        assert!(matches!(request.command, Command::Transfer(_)));
+    }
+
+    #[test]
+    fn a_pause_without_logging_params_is_still_a_pause() {
+        let json = r#"{"message_id":2,"sent_by_device_id":"d","command":{"endpoint":"pause"}}"#;
+        let request: Request = serde_json::from_str(json).unwrap();
+        assert!(matches!(request.command, Command::Pause(_)));
+    }
 }
