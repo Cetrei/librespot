@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Try all resolved addresses for the dealer connection instead of failing after the first one.
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
 - [core] Fixed dealer commands being dropped when Spotify sends `logging_params` as `null`, as it does on the transfer a Jam hands to a joining device
+- [connect] Fixed a transfer of tracks marked as autoplay loading the autoplay context even when the track is in the default one, which never found a Jam host's track
 
 ## [0.8.0] - 2025-11-10
 

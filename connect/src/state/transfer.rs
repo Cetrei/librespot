@@ -124,7 +124,17 @@ impl ConnectState {
             Some(track) => track.clone(),
         };
 
-        let context_ty = if self.current_track(|t| t.is_from_autoplay()) {
+        // A Jam marks its tracks as autoplay although they come from the Jam's own list, so the
+        // flag alone sent the queue to the station behind the Jam, and the host's track was never
+        // found. The autoplay context is only the right one when it exists and the track is not
+        // in the default context.
+        let in_default = self.get_context(ContextType::Default).is_ok_and(|ctx| {
+            Self::find_index_in_context(ctx, |c| c.uri == track.uri || c.uid == track.uid).is_ok()
+        });
+        let context_ty = if self.current_track(|t| t.is_from_autoplay())
+            && !in_default
+            && self.get_context(ContextType::Autoplay).is_ok()
+        {
             ContextType::Autoplay
         } else {
             ContextType::Default
