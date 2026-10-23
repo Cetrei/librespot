@@ -1893,6 +1893,10 @@ impl SpircTask {
             return Ok(());
         }
 
+        // The track changed, so the queue the app mirrors moved with it: a skip, the end of a track
+        // or a Jam host changing songs all pass through here and none of them emits on its own.
+        self.emit_set_queue_event();
+
         let current_uri = self.connect_state.current_track(|t| &t.uri);
         let id = SpotifyUri::from_uri(current_uri)?;
         self.player.load(id, start_playing, position_ms);
